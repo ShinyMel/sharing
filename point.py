@@ -1,67 +1,74 @@
 import numpy as np
 import hashlib
-
-SCALE = 4
-
-class Point:
-    def __init__(self, coo, handler=False, name=None):
-        self.name = name
-        self.coo = coo
-        self.handler = handler
+import numpy as np
 
 
-    @property
-    def coo(self):
-        return self._coo
+class Point(complex): 
+
+    def __new__(cls, arg1, arg2=None, handler=None, invert_y = False):
+        real, imag = arg1, arg2
+
+        if isinstance(arg1, Point):
+            real, imag, handler = arg1.real, arg1.imag, handler or arg1.handler
+
+        elif isinstance(arg1, complex):
+            real, imag = arg1.real, arg1.imag
+        elif isinstance(arg1, np.ndarray):
+            real, imag = real[0], real[1]
+        
+        elif isinstance(arg1, str):
+            real, imag = [float(x) for x in real.split(',')]
+        
+        elif isinstance(arg1, (list,tuple)):
+            real, imag = [float(x) for x in arg1]
     
-    @property
-    def z(self):
-        return complex( self._coo[0],  self._coo[1] )
-    
-    @coo.setter
-    def coo(self, value):
-        if isinstance(value, str):
-            float_list = [float(x) for x in value.split(',')]
-            coo = np.array(float_list)
-        elif isinstance(value, complex):
-            float_list = [value.real, value.imag]
-            coo = np.array(float_list)
-        elif isinstance(value, list):
-            coo = np.array(value)
-        elif isinstance(value, tuple):
-            coo = np.array(list(value))
-        elif isinstance(value, np.ndarray):
-            coo = value
+        if invert_y:
+            imag = -imag
+
+        if handler is None:
+            handler = False
+        real, imag = np.round(real,6), np.round(imag,6)
+         
+        instance = super().__new__(cls, real, imag)
+        instance.handler = handler
+        return instance
+
+ 
+    def __repr__(self):
+        if self.handler:
+            return f"~({self.real},{self.imag})"
         else:
-            raise ValueError("Data must be a string or a NumPy array")
-        self._coo = np.round(coo, SCALE)
-
-
+            return f"({self.real},{self.imag})"
+    
+    def __str__(self ):
+        if self.handler:
+            return   f"\x1B[0m{self.real},{self.imag}\x1B[0m"  #default
+        else:
+            return f"\x1B[32m{self.real},{self.imag}\x1B[0m" #green
+    
     @property
-    def id(self):
-        return f"{np.array2string(self._coo, precision=SCALE, floatmode='fixed')}"
- 
-    @property
-    def real(self):
-        return float(self.coo[0])
- 
-    @property
-    def imag(self):
-        return float(self.coo[1])
+    def svg(self):
+        imag =  -self.imag
+        if self.handler:
+            return   f"\x1B[0m{self.real},{imag}\x1B[0m"  #default
+        else:
+            return f"\x1B[32m{self.real},{imag}\x1B[0m" #green
+    
+    @staticmethod
+    def from_svg( svg, handler=False):
+        return Point(svg, handler=handler, invert_y=True)
  
     def __array__(self):
-        return self.coo
+        return np.array([self.real, self.imag])
 
     def __list__(self):
-        return self.coo
+        return [self.real, self.imag]
 
-    def __repr__(self):
-        h = "*" if {self.handler} else ""
-        return f"{self.coo}{h}"
-        #return f"Point(name={self.name}, coo={self.coo}, handler={self.handler})"
+    def __complex__(self):
+        return complex(self.real, self.imag)  # Converts to a complex number
     
     def copy(self):
-        return Point(self.coo, self.handler, self.name)
+        return Point(self.real, self.imag, self.handler)
     
     def asstring(self):
         if self.handler:
@@ -69,13 +76,9 @@ class Point:
         else:
             return f"\x1B[32m{self.name}\x1B[0m{self.coo}"
 
-    def tosvg(self):
-        x, y = [ np.round(v,SCALE) for v in self.coo ]
-        return f"{x},{y}"
-
     def __eq__(self, other):
+        if isinstance(other, complex):
+            return self.real == other.real and self.imag == other.imag  
         if isinstance(other, Point):
-            return self.value == other.value
-        return False
-
-    
+            return self.real == other.real and self.imag == other.imag and self.handler == other.handler 
+        raise ValueError("Unexpected Type")
